@@ -1,0 +1,321 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Parse HTML to object</title>
+  <script src="https://bossanova.uk/jexcel/v3/jexcel.js"></script>
+  <link rel="stylesheet" href="https://bossanova.uk/jexcel/v3/jexcel.css" type="text/css" />
+  <script src="https://bossanova.uk/jsuites/v2/jsuites.js"></script>
+  <link rel="stylesheet" href="https://bossanova.uk/jsuites/v2/jsuites.css" type="text/css" />
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/pdfmake/0.1.62/pdfmake.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/pdfmake/0.1.62/vfs_fonts.js"></script>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto&display=swap">
+  <link rel="stylesheet" type="text/css" href="https://fonts.googleapis.com/css?family=Material+Icons" />
+</head>
+
+<body onload="onLoad();">
+  <div id="spreadsheet" style="width: 100%;"></div>
+  <br>
+  <div>
+    <iframe id="preview" style="height: 100vh; width: 100%;" frameborder="0"></iframe>
+  </div>
+
+  <script>
+
+    const core = {
+      default: {
+        pageSize: 'A4',
+        pageOrientation: 'portrait',
+        content: []
+      },
+      spreadsheet: document.getElementById('spreadsheet'),
+      preview: document.querySelector('#preview'),
+      source: null
+    };
+
+    function onselection(instance, x1, y1, x2, y2, origin) {
+      core.spreadsheet.start = jexcel.getColumnNameFromId([x1, y1]);
+      core.spreadsheet.end = jexcel.getColumnNameFromId([x2, y2]);
+    }
+
+    function contextMenu(obj, x, y, e) {
+
+      const items = [];
+      if (y === null) {
+        // Insert a new column
+        if (obj.options.allowInsertColumn === true) {
+          items.push({
+            title: obj.options.text.insertANewColumnBefore,
+            onclick: function () {
+              obj.insertColumn(1, parseInt(x), 1);
+            }
+          });
+        }
+
+        if (obj.options.allowInsertColumn === true) {
+          items.push({
+            title: obj.options.text.insertANewColumnAfter,
+            onclick: function () {
+              obj.insertColumn(1, parseInt(x), 0);
+            }
+          });
+        }
+
+        // Delete a column
+        if (obj.options.allowDeleteColumn === true) {
+          items.push({
+            title: obj.options.text.deleteSelectedColumns,
+            onclick: function () {
+              obj.deleteColumn(obj.getSelectedColumns().length ? undefined : parseInt(x));
+            }
+          });
+        }
+      } else {
+        // Insert new row
+        if (obj.options.allowInsertRow === true) {
+          items.push({
+            title: obj.options.text.insertANewRowBefore,
+            onclick: function () {
+              obj.insertRow(1, parseInt(y), 1);
+            }
+          });
+
+          items.push({
+            title: obj.options.text.insertANewRowAfter,
+            onclick: function () {
+              obj.insertRow(1, parseInt(y));
+            }
+          });
+        }
+
+        if (obj.options.allowDeleteRow === true) {
+          items.push({
+            title: obj.options.text.deleteSelectedRows,
+            onclick: function () {
+              obj.deleteRow(obj.getSelectedRows().length ? undefined : parseInt(y));
+            }
+          });
+        }
+      }
+
+      // Line
+      items.push({ type: 'line' });
+      items.push({
+        title: 'Merge',
+        onclick: function () {
+          obj.setMerge(core.spreadsheet.start, obj.getSelectedColumns().length, obj.getSelectedRows().length);
+        }
+      });
+      items.push({
+        title: 'Split',
+        onclick: function () {
+          obj.removeMerge(core.spreadsheet.start);
+        }
+      });
+
+
+      return items;
+    }
+
+    function preview(jexcel) {
+      const doc = docDefinition(jexcel);
+
+      const pdfDocGenerator = pdfMake.createPdf(doc);
+      pdfDocGenerator.getDataUrl((dataUrl) => {
+        core.preview.src = dataUrl;
+      });
+    }
+
+    function onchangestyle(instance) {
+      preview(instance.jexcel);
+    }
+
+    function onchange(instance) {
+      preview(instance.jexcel);
+    }
+
+    function getStyle(jexcel, coord) {
+      function rgbHex(n) {
+        let hex = Number(n).toString(16);
+        if (hex.length < 2) {
+          hex = '0' + hex;
+        }
+        return hex;
+      }
+      const result = {};
+      const style = jexcel.getStyle(coord)
+
+      if (style.includes('font-size:')) {
+        const [fontSize] = style.match(/font-size:\s?\d+px;?/ig);
+        const [size] = fontSize.match(/\d+/ig);
+        result.fontSize = +size;
+      }
+
+      if (style.includes('font-weight:')) {
+        result.bold = true;
+      }
+
+      if (style.includes(' color:')) {
+        const [fontColor] = style.match(/color:\s?rgb\(\d+,\s?\d+,\s?\d+\)/ig);
+        const [rgb] = fontColor.match(/\d+,\s?\d+,\s?\d+/ig);
+        const [r, g, b] = rgb.split(', ');
+        const color = [r, g, b].map(e => rgbHex(e)).join('')
+        result.color = `#${color}`;
+      }
+
+      if (style.includes('background-color:')) {
+        const [backgroundColor] = style.match(/background-color:\s?rgb\(\d+,\s?\d+,\s?\d+\)/ig);
+        const [rgb] = backgroundColor.match(/\d+,\s?\d+,\s?\d+/ig);
+        const [r, g, b] = rgb.split(', ');
+        const color = [r, g, b].map(e => rgbHex(e)).join('')
+        result.fillColor = `#${color}`;
+      }
+
+      if (style.includes('text-align:')) {
+        const [textAlign] = style.match(/text-align:\s?(left|center|right)/ig);
+        const [alignment] = textAlign.match(/(left|center|right)/ig);
+        result.alignment = alignment;
+      }
+      return result;
+    }
+
+    function docDefinition(jexcel) {
+      const columns = jexcel.records[0].length + 1;
+      const rows = jexcel.records.length + 1;
+      const table = { body: [] };
+      const alphabet = [...Array(26).keys()].map(i => String.fromCharCode(i + 65));
+
+      for (let i = 1; i < jexcel.table.rows.length - 1; ++i) {
+        const row = jexcel.table.rows[i];
+        for (let j = 1; j < row.cells.length; ++j) {
+          const { innerHTML, rowSpan, colSpan } = row.cells[j];
+          if (!table.body[i - 1]) table.body[i - 1] = [];
+
+
+
+          const el = { text: `${innerHTML}`, ...getStyle(jexcel, `${alphabet[j - 1]}${i}`) };
+          if (rowSpan > 1) el.rowSpan = rowSpan
+          if (colSpan > 1) el.colSpan = colSpan
+          table.body[i - 1][j - 1] = innerHTML !== '' ? el : '';
+        }
+      }
+
+      const result = {
+        ...core.default,
+        content: [{ table }]
+      }
+      core.source = JSON.stringify(result);
+      return result;
+    }
+
+    function onLoad() {
+      const data = new Array(10).fill(new Array(26).fill(''));
+
+      jexcel(core.spreadsheet, {
+        data,
+        allowComments: false,
+        contextMenu,
+        onselection,
+        onchange,
+        onchangestyle,
+        toolbar: [
+          {
+            type: 'i',
+            content: 'landscape',
+            onclick: function () {
+              core.default.pageOrientation = 'landscape';
+              const { jexcel } = core.spreadsheet;
+              preview(jexcel);
+            }
+          },
+          {
+            type: 'i',
+            content: 'portrait',
+            onclick: function () {
+              core.default.pageOrientation = 'portrait';
+              const { jexcel } = core.spreadsheet;
+              preview(jexcel);
+            }
+          },
+          {
+            type: 'select',
+            k: 'font-family',
+            v: ['Robot']
+          },
+          {
+            type: 'select',
+            k: 'font-size',
+            v: ['6px', '9px', '10px', '11px', '12px', '13px', '14px', '15px', '16px', '17px', '18px', '19px', '20px', '24px', '36px']
+          },
+          {
+            type: 'i',
+            content: 'format_align_left',
+            k: 'text-align',
+            v: 'left'
+          },
+          {
+            type: 'i',
+            content: 'format_align_center',
+            k: 'text-align',
+            v: 'center'
+          },
+          {
+            type: 'i',
+            content: 'format_align_right',
+            k: 'text-align',
+            v: 'right'
+          },
+          {
+            type: 'i',
+            content: 'format_bold',
+            k: 'font-weight',
+            v: 'bold'
+          },
+          {
+            type: 'color',
+            content: 'format_color_text',
+            k: 'color'
+          },
+          {
+            type: 'color',
+            content: 'format_color_fill',
+            k: 'background-color'
+          },
+          {
+            type: 'i',
+            content: 'call_merge',
+            onclick: function () {
+              const { jexcel } = core.spreadsheet;
+              jexcel.setMerge(core.spreadsheet.start, jexcel.getSelectedColumns().length, jexcel.getSelectedRows().length);
+            }
+          },
+          {
+            type: 'i',
+            content: 'call_split',
+            onclick: function () {
+              const { jexcel } = core.spreadsheet;
+              jexcel.removeMerge(core.spreadsheet.start);
+            }
+          },
+          {
+            type: 'i',
+            content: 'code',
+            onclick: function () {
+              const source = document.createElement('input');
+              source.value = core.source;
+
+              document.body.appendChild(source);
+              source.select()
+              document.execCommand('copy');
+              document.body.removeChild(source);
+            }
+          }
+        ]
+      });
+    }
+  </script>
+</body>
+
+</html>
