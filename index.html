@@ -28,6 +28,7 @@
       default: {
         pageSize: 'A4',
         pageOrientation: 'portrait',
+        pageMargins: [28.3465, 28.3465],
         content: []
       },
       spreadsheet: document.getElementById('spreadsheet'),
@@ -136,6 +137,10 @@
       preview(instance.jexcel);
     }
 
+    function onresizecolumn(instance) {
+      preview(instance.jexcel);
+    }
+
     function getStyle(jexcel, coord) {
       function rgbHex(n) {
         let hex = Number(n).toString(16);
@@ -184,16 +189,15 @@
     function docDefinition(jexcel) {
       const columns = jexcel.records[0].length + 1;
       const rows = jexcel.records.length + 1;
-      const table = { body: [] };
+      const table = { body: [], widths: jexcel.getWidth(0).map(e => e * 0.75) };
       const alphabet = [...Array(26).keys()].map(i => String.fromCharCode(i + 65));
 
       for (let i = 1; i < jexcel.table.rows.length - 1; ++i) {
+
         const row = jexcel.table.rows[i];
         for (let j = 1; j < row.cells.length; ++j) {
           const { innerHTML, rowSpan, colSpan } = row.cells[j];
           if (!table.body[i - 1]) table.body[i - 1] = [];
-
-
 
           const el = { text: `${innerHTML}`, ...getStyle(jexcel, `${alphabet[j - 1]}${i}`) };
           if (rowSpan > 1) el.rowSpan = rowSpan
@@ -220,6 +224,7 @@
         onselection,
         onchange,
         onchangestyle,
+        onresizecolumn,
         toolbar: [
           {
             type: 'i',
@@ -310,6 +315,14 @@
               source.select()
               document.execCommand('copy');
               document.body.removeChild(source);
+            }
+          },
+          {
+            type: 'i',
+            content: 'refresh',
+            onclick: function () {
+              const { jexcel } = core.spreadsheet;
+              preview(jexcel);
             }
           }
         ]
