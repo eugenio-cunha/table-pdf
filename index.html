@@ -94,7 +94,7 @@
       preview: document.querySelector('#preview'),
       source: null,
       options: {
-        data: new Array(30).fill(new Array(12).fill('')),
+        data: new Array(25).fill(new Array(12).fill('')),
         rowResize: true,
         allowComments: false,
         contextMenu,
@@ -229,7 +229,7 @@
       if (res) {
         const { jexcel } = core.spreadsheet;
         jexcel.destroyMerged();
-        jexcel.setData(new Array(30).fill(new Array(12).fill('')));
+        jexcel.setData(new Array(25).fill(new Array(12).fill('')));
         for (let i; i < 12; ++i) {
           jexcel.setWidth(i, '50');
         }
