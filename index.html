@@ -13,13 +13,72 @@
   <script src="https://cdnjs.cloudflare.com/ajax/libs/pdfmake/0.1.62/vfs_fonts.js"></script>
   <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto&display=swap">
   <link rel="stylesheet" type="text/css" href="https://fonts.googleapis.com/css?family=Material+Icons" />
+
+  <style>
+    .resize {
+      overflow: auto;
+      resize: horizontal;
+    }
+
+    .row {
+      display: flex;
+      flex-direction: row;
+      flex-wrap: wrap;
+      width: 100%;
+    }
+
+    .column {
+      flex: 50%;
+      display: flex;
+      flex-direction: column;
+    }
+
+    .tab {
+      overflow: hidden;
+      border: 1px solid #ccc;
+      background-color: #f1f1f1;
+    }
+
+    /* Style the buttons that are used to open the tab content */
+    .tab button {
+      background-color: inherit;
+      float: left;
+      border: none;
+      outline: none;
+      cursor: pointer;
+      padding: 14px 16px;
+      transition: 0.3s;
+    }
+
+    /* Change background color of buttons on hover */
+    .tab button:hover {
+      background-color: #ddd;
+    }
+
+    /* Create an active/current tablink class */
+    .tab button.active {
+      background-color: #ccc;
+    }
+
+    /* Style the tab content */
+    .tabcontent {
+      display: none;
+      padding: 6px 12px;
+      border: 1px solid #ccc;
+      border-top: none;
+    }
+  </style>
 </head>
 
 <body onload="onLoad();">
-  <div id="spreadsheet" style="width: 100%;"></div>
-  <br>
-  <div>
-    <iframe id="preview" style="height: 100vh; width: 100%;" frameborder="0"></iframe>
+  <div class="row">
+    <div class="column resize">
+      <div id="spreadsheet"></div>
+    </div>
+    <div class="column resize">
+      <iframe id="preview" style="height: 100vh; width: 100%;" frameborder="0"></iframe>
+    </div>
+
   </div>
 
   <script>
@@ -33,8 +92,194 @@
       },
       spreadsheet: document.getElementById('spreadsheet'),
       preview: document.querySelector('#preview'),
-      source: null
+      source: null,
+      options: {
+        data: new Array(30).fill(new Array(12).fill('')),
+        rowResize: true,
+        allowComments: false,
+        contextMenu,
+        onselection,
+        onmerge: onchange,
+        onchangestyle: onchange,
+        onresizecolumn: onchange,
+        onafterchanges: onchange,
+        toolbar: [
+          {
+            type: 'i',
+            content: 'insert_drive_file',
+            onclick: reset
+          },
+          {
+            type: 'i',
+            content: 'save',
+            onclick: save
+          },
+          {
+            type: 'i',
+            content: 'open_in_browser',
+            onclick: open
+          },
+          {
+            type: 'i',
+            content: 'landscape',
+            onclick: function () {
+              core.default.pageOrientation = 'landscape';
+              const { jexcel } = core.spreadsheet;
+              preview(jexcel);
+            }
+          },
+          {
+            type: 'i',
+            content: 'portrait',
+            onclick: function () {
+              core.default.pageOrientation = 'portrait';
+              const { jexcel } = core.spreadsheet;
+              preview(jexcel);
+            }
+          },
+          {
+            type: 'select',
+            k: 'font-family',
+            v: ['Robot']
+          },
+          {
+            type: 'select',
+            k: 'font-size',
+            v: ['6px', '9px', '10px', '11px', '12px', '13px', '14px', '15px', '16px', '17px', '18px', '19px', '20px', '24px', '36px']
+          },
+          {
+            type: 'i',
+            content: 'format_align_left',
+            k: 'text-align',
+            v: 'left'
+          },
+          {
+            type: 'i',
+            content: 'format_align_center',
+            k: 'text-align',
+            v: 'center'
+          },
+          {
+            type: 'i',
+            content: 'format_align_right',
+            k: 'text-align',
+            v: 'right'
+          },
+          {
+            type: 'i',
+            content: 'format_bold',
+            k: 'font-weight',
+            v: 'bold'
+          },
+          {
+            type: 'color',
+            content: 'format_color_text',
+            k: 'color'
+          },
+          {
+            type: 'color',
+            content: 'format_color_fill',
+            k: 'background-color'
+          },
+          {
+            type: 'i',
+            content: 'call_merge',
+            onclick: function () {
+              const { jexcel } = core.spreadsheet;
+              jexcel.setMerge(core.spreadsheet.start, jexcel.getSelectedColumns().length, jexcel.getSelectedRows().length);
+            }
+          },
+          {
+            type: 'i',
+            content: 'call_split',
+            onclick: function () {
+              const { jexcel } = core.spreadsheet;
+              jexcel.removeMerge(core.spreadsheet.start);
+            }
+          },
+          {
+            type: 'i',
+            content: 'code',
+            onclick: function () {
+              let source = JSON.parse(core.source).toSource();
+
+              source = source.replace(/"/g, `'`);
+              source = source.substr(1);
+              source = source.substring(0, source.length - 1);
+              const blob = new Blob([source], { type: 'plain/text' });
+
+              const save = window.saveAs;
+              save(blob, 'source.js');
+            }
+          },
+          {
+            type: 'i',
+            content: 'refresh',
+            onclick: function () {
+              const { jexcel } = core.spreadsheet;
+              preview(jexcel);
+            }
+          }
+        ]
+      }
     };
+
+    function reset() {
+      const res = confirm('Criar uma nova tabela?');
+      if (res) {
+        const { jexcel } = core.spreadsheet;
+        jexcel.destroyMerged();
+        jexcel.setData(new Array(30).fill(new Array(12).fill('')));
+        for (let i; i < 12; ++i) {
+          jexcel.setWidth(i, '50');
+        }
+        preview(jexcel);
+      }
+    }
+
+    function save() {
+      const { jexcel } = core.spreadsheet;
+      const style = jexcel.getStyle();
+      const merge = jexcel.getMerge();
+      const data = jexcel.getData();
+
+      const blob = new Blob([JSON.stringify({ data, merge, style })], { type: 'application/json' });
+
+      const save = window.saveAs;
+      save(blob, 'source.json');
+    }
+
+    function open() {
+      const { jexcel } = core.spreadsheet;
+      const input = document.createElement('input');
+      input.setAttribute('type', 'file');
+      input.setAttribute('accept', 'text/json|application/json');
+      input.onchange = (event) => {
+        const reader = new FileReader();
+        reader.onload = function (e) {
+          const file = JSON.parse(e.target.result);
+          jexcel.setData(file.data);
+          for (const key in file.merge) {
+            const [colspan, rowspan] = file.merge[key];
+            jexcel.setMerge(key, colspan, rowspan);
+          }
+          jexcel.setStyle(file.style);
+        };
+
+        reader.readAsText(event.target.files[0]);
+
+      }
+      input.click();
+    }
+
+    function history(instance) {
+      const { jexcel } = instance;
+      const style = jexcel.getStyle();
+      const merge = jexcel.getMerge();
+      const data = jexcel.getData();
+      const file = JSON.stringify({ style, merge, data });
+      localStorage.setItem('history', file);
+    }
 
     function onselection(instance, x1, y1, x2, y2, origin) {
       core.spreadsheet.start = jexcel.getColumnNameFromId([x1, y1]);
@@ -129,19 +374,12 @@
       });
     }
 
-    function onchangestyle(instance) {
-      preview(instance.jexcel);
-    }
-
     function onchange(instance) {
+      history(instance);
       preview(instance.jexcel);
     }
 
-    function onresizecolumn(instance) {
-      preview(instance.jexcel);
-    }
-
-    function getStyle(jexcel, coord) {
+    function getStyle(jexcel, row, column) {
       function rgbHex(n) {
         let hex = Number(n).toString(16);
         if (hex.length < 2) {
@@ -150,7 +388,7 @@
         return hex;
       }
       const result = {};
-      const style = jexcel.getStyle(coord)
+      const style = jexcel.getStyle(`${String.fromCharCode(column + 64)}${row}`)
 
       if (style.includes('font-size:')) {
         const [fontSize] = style.match(/font-size:\s?\d+px;?/ig);
@@ -187,22 +425,34 @@
     }
 
     function docDefinition(jexcel) {
-      const columns = jexcel.records[0].length + 1;
-      const rows = jexcel.records.length + 1;
-      const table = { body: [], widths: jexcel.getWidth(0).map(e => e * 0.75) };
-      const alphabet = [...Array(26).keys()].map(i => String.fromCharCode(i + 65));
-
-      for (let i = 1; i < jexcel.table.rows.length - 1; ++i) {
+      const rows = jexcel.records.length;
+      const heights = new Array(rows).fill(26).map((e, i) => {
+        let [height] = jexcel.getHeight(i);
+        if (height) {
+          if (typeof height === 'string') {
+            height = +height.replace('px', '');
+          }
+          return height * 0.75;
+        }
+        return e;
+      });
+      
+      const widths = jexcel.getWidth().map(e => e ? e * 0.75  : 0);
+      const table = { body: [], widths, heights };
+      for (let i = 0; i < jexcel.table.rows.length; ++i) {
+        if (i === 0 ) continue;
 
         const row = jexcel.table.rows[i];
-        for (let j = 1; j < row.cells.length; ++j) {
-          const { innerHTML, rowSpan, colSpan } = row.cells[j];
-          if (!table.body[i - 1]) table.body[i - 1] = [];
+        for (let j = 0; j < row.cells.length; ++j) {
+          if (j === 0 ) continue;
 
-          const el = { text: `${innerHTML}`, ...getStyle(jexcel, `${alphabet[j - 1]}${i}`) };
+          const { innerHTML, rowSpan, colSpan } = row.cells[j];
+          if (!table.body[i-1]) table.body[i-1] = [];
+
+          const el = { text: `${innerHTML}`, ...getStyle(jexcel, i, j) };
           if (rowSpan > 1) el.rowSpan = rowSpan
           if (colSpan > 1) el.colSpan = colSpan
-          table.body[i - 1][j - 1] = innerHTML !== '' ? el : '';
+          table.body[i - 1][j - 1] = el;
         }
       }
 
@@ -210,123 +460,26 @@
         ...core.default,
         content: [{ table }]
       }
+
       core.source = JSON.stringify(result);
       return result;
     }
 
     function onLoad() {
-      const data = new Array(10).fill(new Array(26).fill(''));
+      jexcel(core.spreadsheet, core.options);
 
-      jexcel(core.spreadsheet, {
-        data,
-        allowComments: false,
-        contextMenu,
-        onselection,
-        onchange,
-        onchangestyle,
-        onresizecolumn,
-        toolbar: [
-          {
-            type: 'i',
-            content: 'landscape',
-            onclick: function () {
-              core.default.pageOrientation = 'landscape';
-              const { jexcel } = core.spreadsheet;
-              preview(jexcel);
-            }
-          },
-          {
-            type: 'i',
-            content: 'portrait',
-            onclick: function () {
-              core.default.pageOrientation = 'portrait';
-              const { jexcel } = core.spreadsheet;
-              preview(jexcel);
-            }
-          },
-          {
-            type: 'select',
-            k: 'font-family',
-            v: ['Robot']
-          },
-          {
-            type: 'select',
-            k: 'font-size',
-            v: ['6px', '9px', '10px', '11px', '12px', '13px', '14px', '15px', '16px', '17px', '18px', '19px', '20px', '24px', '36px']
-          },
-          {
-            type: 'i',
-            content: 'format_align_left',
-            k: 'text-align',
-            v: 'left'
-          },
-          {
-            type: 'i',
-            content: 'format_align_center',
-            k: 'text-align',
-            v: 'center'
-          },
-          {
-            type: 'i',
-            content: 'format_align_right',
-            k: 'text-align',
-            v: 'right'
-          },
-          {
-            type: 'i',
-            content: 'format_bold',
-            k: 'font-weight',
-            v: 'bold'
-          },
-          {
-            type: 'color',
-            content: 'format_color_text',
-            k: 'color'
-          },
-          {
-            type: 'color',
-            content: 'format_color_fill',
-            k: 'background-color'
-          },
-          {
-            type: 'i',
-            content: 'call_merge',
-            onclick: function () {
-              const { jexcel } = core.spreadsheet;
-              jexcel.setMerge(core.spreadsheet.start, jexcel.getSelectedColumns().length, jexcel.getSelectedRows().length);
-            }
-          },
-          {
-            type: 'i',
-            content: 'call_split',
-            onclick: function () {
-              const { jexcel } = core.spreadsheet;
-              jexcel.removeMerge(core.spreadsheet.start);
-            }
-          },
-          {
-            type: 'i',
-            content: 'code',
-            onclick: function () {
-              const source = document.createElement('input');
-              source.value = core.source;
-
-              document.body.appendChild(source);
-              source.select()
-              document.execCommand('copy');
-              document.body.removeChild(source);
-            }
-          },
-          {
-            type: 'i',
-            content: 'refresh',
-            onclick: function () {
-              const { jexcel } = core.spreadsheet;
-              preview(jexcel);
-            }
-          }
-        ]
-      });
+      const history = localStorage.getItem('history');
+      if (history) {
+        const { jexcel } = core.spreadsheet;
+        const file = JSON.parse(history);
+        jexcel.setData(file.data);
+        
+        for (const key in file.merge) {
+          const [colspan, rowspan] = file.merge[key];
+          jexcel.setMerge(key, colspan, rowspan);
+        }
+        jexcel.setStyle(file.style);
+      }
     }
   </script>
 </body>
